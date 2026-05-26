@@ -14,7 +14,7 @@ Adriano Marzol Perini
 ## Estructura del proyecto
 
 ```text
-ImagenesTP1/
+TP1/
   Ej1/
     tp1Ej1.py                           # Script principal: ecualización local de histograma
     Imagen_con_detalles_escondidos.tif  # Imagen de entrada del ejercicio
@@ -29,7 +29,6 @@ ImagenesTP1/
   TUIA_PDI_TP1_2026_C1.pdf              # Enunciado completo del trabajo práctico
   README.md
   requirements.txt                      # Librerías requeridas
-  .gitignore                            # Ignora __pycache__/ y otros
 ```
 
 ## Uso
