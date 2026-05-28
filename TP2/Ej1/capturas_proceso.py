@@ -1,7 +1,7 @@
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from helpers_ej1 import (
+from helpers import (
     aislar_cinta_transportadora,
     encontrar_pastillas
 )

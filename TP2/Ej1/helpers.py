@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 SHADOW_THRESHOLD = 50
-GLOBAL_THRESHOLD = 100
+GLOBAL_THRESHOLD = 120
 MIN_AREA_THRESHOLD = 10
 
 def aislar_cinta_transportadora(img, umbral=SHADOW_THRESHOLD, padding=0):
@@ -42,9 +42,9 @@ def encontrar_pastillas(img, umbral=GLOBAL_THRESHOLD):
 
     img_gray = img_hsv[:, :, 2]
 
-    _, thresh = cv2.threshold(img_gray, 128, 255, cv2.THRESH_BINARY)
+    _, thresh = cv2.threshold(img_gray, umbral, 255, cv2.THRESH_BINARY)
 
-    contornos, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    contornos, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     contornos_limpios = []
     for c in contornos:
