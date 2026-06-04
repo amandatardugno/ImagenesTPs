@@ -4,11 +4,21 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from helpers import (
     aislar_cinta_transportadora,
-    encontrar_pastillas
+    encontrar_pastillas,
+    obtener_bordes
 )
 
 img_path = '../data/pills.png'
 img = cv2.imread(img_path)
+
+# Mostramos funcionamiento del Canny
+edges = obtener_bordes(img)
+plt.figure(figsize=(8, 6))
+plt.imshow(edges, cmap='gray')
+plt.title('Detección de Bordes con Canny')
+plt.axis('off')
+plt.show(block=False)
+
 
 # Obtenemos las coordenadas de la cinta
 coordenadas = aislar_cinta_transportadora(img, padding=10)
