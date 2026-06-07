@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 
 SHADOW_THRESHOLD = 50
 GLOBAL_THRESHOLD = 120
@@ -132,3 +133,69 @@ def encontrar_pastillas(img, umbral=GLOBAL_THRESHOLD):
             contornos_limpios.append(c)
 
     return contornos_limpios
+
+def identificar_color_pastilla(img_hsv, contorno):
+    """
+    Determina el color predominante de una pastilla a partir de su contorno.
+    img_hsv: Imagen recortada de la cinta en espacio HSV.
+    contorno: Contorno individual de la pastilla.
+    Devuelve: String con el nombre del color.
+    """
+    mascara = np.zeros(img_hsv.shape[:2], dtype=np.uint8)
+    cv2.drawContours(mascara, [contorno], -1, 255, -1)
+    
+    promedio_color = cv2.mean(img_hsv, mask=mascara)
+    h_promedio = promedio_color[0]
+    s_promedio = promedio_color[1]
+    
+    if s_promedio < 75: 
+        return "Blanca"
+    elif 20 < h_promedio < 40:
+        return "Naranja"
+    elif 40 < h_promedio < 80:
+        return "Azul"
+    elif 120 < h_promedio < 160:
+        return "Rosa"
+    else:
+        return "Desconocido"
+
+class Pastilla:
+    def __init__(self, contorno, img_hsv):
+        self.contorno = contorno
+        self.area = cv2.contourArea(contorno)
+        self.perimetro = cv2.arcLength(contorno, True)
+        
+        # Factor de forma
+        if self.perimetro > 0:
+            self.factor_forma = self.area / (self.perimetro ** 2)
+        else:
+            self.factor_forma = 0
+            
+        # Centroide
+        M = cv2.moments(contorno)
+        if M["m00"] != 0:
+            self.cx = int(M["m10"] / M["m00"])
+            self.cy = int(M["m01"] / M["m00"])
+        else:
+            self.cx, self.cy = 0, 0
+            
+        # Identificación de propiedades
+        self.color = identificar_color_pastilla(img_hsv, contorno)
+        self.forma = self._determinar_forma()
+        
+        # Tipo de pastilla
+        letra_color = self.color[0].upper()
+        letra_forma = self.forma[0].upper()
+        self.tipo = f"{letra_color}{letra_forma}"
+        
+        self.id_numero = 0
+        self.etiqueta = ""
+
+    def _determinar_forma(self):
+        if self.factor_forma > 0.069:
+            return "Redonda"
+        elif 0.061 <= self.factor_forma <= 0.069:
+            return "Cuadrada"
+        else:
+            return "Alargada"
+        
