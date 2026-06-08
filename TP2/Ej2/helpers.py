@@ -1,13 +1,31 @@
+import os
 import cv2
 import numpy as np
 
 MIN_AREA_THRESHOLD = 50
+TAMANIO_PATENTE = (45,65)
+
+def normalizar_imagen(img, ancho_estandar=800):
+    """
+    Redimensiona la imagen a un ancho fijo manteniendo la proporción (aspect ratio).
+    Esto garantiza que los kernels morfológicos y los umbrales de área en píxeles 
+    funcionen igual para imágenes de cualquier resolución original.
+    """
+    alto_original, ancho_original = img.shape[:2]
+    
+    # Calculamos la proporción de la escala
+    proporcion = ancho_estandar / float(ancho_original)
+    alto_nuevo = int(alto_original * proporcion)
+    
+    img_redimensionada = cv2.resize(img, (ancho_estandar, alto_nuevo), interpolation=cv2.INTER_AREA)
+    
+    return img_redimensionada
 
 def aplicar_blackhat(img_gray, kernel_size=(15, 15)):
     """
     Usa black-hat para extraer las letras negras sobre el fondo blanco de la patente.
     img_gray: Imagen original en escala de grises
-    kernel_size: Kernel a usar en la transformaci'on
+    kernel_size: Kernel a usar en la transformación
     Devuelve: Imagen transformada
     """
 
@@ -25,11 +43,11 @@ def binarizar_adaptativo(img_gray):
     """
     thresh = cv2.adaptiveThreshold(img_gray, 255, 
                                     cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                    cv2.THRESH_BINARY, 9, 0)
+                                    cv2.THRESH_BINARY, 51, -5)
     
     return thresh
 
-def filtrar_caracteres(thresh):
+def filtrar_contornos(thresh):
     """
     Busca componentes conectadas que parezcan letras y sean 7 alineadas (compatible con la patente).
     thresh: Imagen binarizada
@@ -48,9 +66,13 @@ def filtrar_caracteres(thresh):
         # Filtramos por relación de aspecto (entre 65/45 y 65/35, con margen) y por area
         aspect_ratio = h / float(w)
         
-        if 1.3 <= aspect_ratio <= 2.0 and MIN_AREA_THRESHOLD <= area <= 0.05 * stats[0][4]:
+        if 1.5 <= aspect_ratio <= 5.0 and MIN_AREA_THRESHOLD <= area <= 0.05 * stats[0][4]:
             candidatos.append(stats[i])
     
+    return candidatos
+
+def encontrar_patente(candidatos):
+
     patente_detectada = []
 
     for i in range(len(candidatos)):
@@ -72,11 +94,11 @@ def filtrar_caracteres(thresh):
             dist_x = abs(x1 - x2)
 
             # Condiciones para decir que están en una patente
-            # 1. dist_y: Comparten el renglón (tolerancia 10% de la altura).
+            # 1. dist_y: Comparten el renglón (tolerancia 40% de la altura).
             # 2. diff_h: Miden casi lo mismo de alto (tolerancia 10%).
             # 3. dist_x: Pertenecen a la misma patente. La distancia máxima entre la 
             #  primera letra y la última es, técnicamente, 7.5 u 8.5 veces el ancho de una letra.
-            if dist_y <= max_h * 0.1 and diff_h <= max_h * 0.1 and dist_x <= max_w * 9:
+            if dist_y <= max_h * 0.4 and diff_h <= max_h * 0.1 and dist_x <= max_w * 10:
                 grupo_actual.append(candidatos[j])
 
         # Si hay 7 caracteres que cumplieron, es la patente.
@@ -89,5 +111,5 @@ def filtrar_caracteres(thresh):
             
             patente_detectada = grupo_unico
             break
-        
+
     return patente_detectada

@@ -1,13 +1,17 @@
 import cv2
 import matplotlib.pyplot as plt
 from helpers import (
+    normalizar_imagen,
     aplicar_blackhat,
     binarizar_adaptativo,
-    filtrar_caracteres
+    filtrar_contornos,
+    encontrar_patente,
 )
 
-img_path = '../data/img_12.jpg'
+img_path = '../data/img_1.jpg'
 img_color = cv2.imread(img_path)
+
+img_color = normalizar_imagen(img_color, ancho_estandar=1500)
 
 img_gray = cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY)
 
@@ -17,27 +21,46 @@ img_bh = aplicar_blackhat(img_gray, kernel_size=(15, 15))
 # Imagen binarizada
 thresh = binarizar_adaptativo(img_bh)
 
+#kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+#thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+#kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+#thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+
 # Encontramos la patente
-letras_detectadas = filtrar_caracteres(thresh)
+contornos_detectados = filtrar_contornos(thresh)
 
 # Mostramos los resultados
-img_resultado = cv2.cvtColor(img_color, cv2.COLOR_BGR2RGB)
+img_contornos = cv2.cvtColor(img_color, cv2.COLOR_BGR2RGB)
+img_resultado = img_contornos.copy()
+
+letras_detectadas = encontrar_patente(contornos_detectados)
+
+for (x, y, w, h, area) in contornos_detectados:
+    cv2.rectangle(img_contornos, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+    
 for (x, y, w, h, area) in letras_detectadas:
     cv2.rectangle(img_resultado, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-plt.figure(figsize=(15, 5))
+plt.figure(figsize=(12, 8))
 
-plt.subplot(1, 3, 1)
+plt.subplot(2, 2, 1)
 plt.imshow(img_bh, cmap='gray')
 plt.title('Black Hat')
 plt.axis('off')
 
-plt.subplot(1, 3, 2)
+plt.subplot(2, 2, 2)
 plt.imshow(thresh, cmap='gray')
 plt.title('Umbral Adaptativo')
 plt.axis('off')
 
-plt.subplot(1, 3, 3)
+plt.subplot(2, 2, 3)
+plt.imshow(img_contornos)
+plt.title(f'Segmentación de contornos')
+plt.axis('off')
+
+
+plt.subplot(2, 2, 4)
 plt.imshow(img_resultado)
 plt.title(f'Segmentación de letras')
 plt.axis('off')
@@ -45,7 +68,7 @@ plt.axis('off')
 plt.tight_layout()
 plt.show()
 
-# Si querés ver los recortes individuales de las letras:
+# Para ver los recortes individuales de las letras:
 if len(letras_detectadas) > 0:
     plt.figure(figsize=(10, 2))
     for i, (x, y, w, h, area) in enumerate(letras_detectadas):
