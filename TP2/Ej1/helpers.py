@@ -148,15 +148,12 @@ def identificar_color_pastilla(img_hsv, contorno):
     h_promedio = promedio_color[0]
     s_promedio = promedio_color[1]
     
-    # Las pastillas blancas son las unicas realmente desaturadas (S ~ 1-2).
-    # Las de color tienen S alta (>60), por lo que el corte va en ~40.
     if s_promedio < 40:
         return "Blanca"
     elif 15 < h_promedio < 35:
         return "Naranja"
     elif 40 < h_promedio < 90:
         return "Azul"
-    # El rosa/rojo cae en los extremos del canal H (cerca de 0 o de 179).
     elif h_promedio >= 160 or h_promedio < 10:
         return "Rosa"
     else:
