@@ -43,7 +43,9 @@ ax.add_patch(rect)
 plt.axis('off')
 plt.show(block=False)
 
-img_cinta_recortada = img[y:y+h, x:x+w]
+# Copiamos la ROI para que el dibujo de contornos no contamine la imagen
+# original, ya que mas adelante muestreamos el color sobre ella.
+img_cinta_recortada = img[y:y+h, x:x+w].copy()
 
 contornos_pastillas = encontrar_pastillas(img_cinta_recortada)
 
