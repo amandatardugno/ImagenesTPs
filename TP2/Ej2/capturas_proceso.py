@@ -6,9 +6,11 @@ from helpers import (
     binarizar_adaptativo,
     filtrar_contornos,
     encontrar_patente,
+    cargar_templates,
+    leer_caracteres_patente,
 )
 
-img_path = '../data/img_1.jpg'
+img_path = '../data/img_11.jpg'
 img_color = cv2.imread(img_path)
 
 img_color = normalizar_imagen(img_color, ancho_estandar=1500)
@@ -29,11 +31,20 @@ thresh = binarizar_adaptativo(img_bh)
 # Encontramos la patente
 contornos_detectados = filtrar_contornos(thresh)
 
+mis_templates = cargar_templates("templates")
+
 # Mostramos los resultados
 img_contornos = cv2.cvtColor(img_color, cv2.COLOR_BGR2RGB)
 img_resultado = img_contornos.copy()
 
 letras_detectadas = encontrar_patente(contornos_detectados)
+
+texto_final = leer_caracteres_patente(thresh, letras_detectadas, mis_templates)
+print(f"LA PATENTE DETECTADA ES: {texto_final}")
+
+# Lo mostramos en la imagen resultado
+cv2.putText(img_resultado, texto_final, (letras_detectadas[0][0], letras_detectadas[0][1] - 15), 
+            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
 
 for (x, y, w, h, area) in contornos_detectados:
     cv2.rectangle(img_contornos, (x, y), (x + w, y + h), (0, 255, 0), 2)

@@ -23,7 +23,17 @@
     3.  Como el formato es "AB 123 CD", hay espacios grandes entre bloques de caracteres, pero reglamentados. La tolerancia en el eje X se ajustó a 10 veces el ancho máximo de letra, permitiendo que el algoritmo entienda que la "A" (primera letra) y la "D" (última) pertenecen a la misma patente a pesar del espacio central. El valor por reglamento da entre 7.5 y 8.5 anchos la diferencia entre la primera y última letra, pero damos margen.
 * La condición final de éxito exige que el grupo formado tenga exactamente 7 elementos (`len(grupo_actual) == 7`). Una vez encontrado el grupo válido, se ordena de izquierda a derecha usando su coordenada X, dejándolo listo para mostrar segmentado por caracter en orden.
 
+### Reconocimiento Óptico de Caracteres (OCR) mediante Template Matching
+
+* Para la transcripción de las patentes segmentadas a texto, se descartó el uso de librerías de IA o externas (como PyTesseract) priorizando una solución pura en OpenCV mediante la función `cv2.matchTemplate`. Esto permite un control mayor sobre el proceso de reconocimiento.
+* El algoritmo de Template Matching es extremadamente sensible a las diferencias de escala (compara píxel a píxel). Para solucionar esto, se desarrolló un script auxiliar que genera imágenes "template" perfectas de cada letra (A-Z) y número (0-9) en blanco y negro, fijándolas a un tamaño estandarizado de 45x65 píxeles (proporcional al tamaño reglamentario). Durante la ejecución del pipeline principal, cada caracter recortado de la patente se redimensiona a este mismo tamaño exacto antes de la comparación.
+* Al recortar los caracteres de la imagen binarizada, se observó que algunos presentaban discontinuidades o huecos internos en el trazo debido a desgastes en la pintura de la chapa o reflejos puntuales. Para asegurar una correlación alta con los templates sólidos, se aplicó una operación morfológica de Clausura (kernel de 3x3) únicamente sobre el recorte del caracter. Esto actuó como un filtro de soldadura, rellenando imperfecciones y engrosando el trazo.
+* Uno de los errores más comunes en el OCR clásico es la confusión de caracteres visualmente similares (ej. "B" con "8", o "O" con "0"). Para erradicar este problema, se implementó una lógica de filtrado posicional aprovechando que la patente del Mercosur tiene un patrón estricto: Letra-Letra-Número-Número-Número-Letra-Letra. 
+  - Usando el índice iterativo de la detección, si la posición correspondía a una letra (0, 1, 5, 6), el recorte solo se comparaba contra el subconjunto de templates de letras (`.isalpha()`).
+  - Si correspondía a un número (2, 3, 4), se comparaba exclusivamente contra números (`.isdigit()`).
+  Esta validación contextual eliminó los falsos positivos y redujo la cantidad de comparaciones matemáticas necesarias por caracter, optimizando el rendimiento general del algoritmo.
+
 ### Problemas aún sin resolver:
 * La imagen 7 tiene su última letra como una T despintada. El código como está, la recorta como si fuera una I.
 * Se intentó usar una clausura y una apertura luego del binarizado para corregir este problema, pero hacía que no se detecte la patente de la imagen 11.
-* Intentamos detectar las patentes comparando con un template de la fuente usada legalmente (FE-Scrift). Detecta en muchos casos bien, pero en muchos otros falla. ¿Lo omitimos, lo hacemos con algunos errores, o probamos otra manera?
+* Intentamos detectar las patentes comparando con un template de la fuente usada legalmente (FE-Scrift). Detecta en muchos casos bien, pero en muchos otros falla. ¿Probamos pyTesseract a ver si soluciona?

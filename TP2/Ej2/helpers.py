@@ -113,3 +113,66 @@ def encontrar_patente(candidatos):
             break
 
     return patente_detectada
+
+def cargar_templates(carpeta="templates"):
+    """
+    Lee todas las imágenes de la carpeta y las guarda en un diccionario.
+    Clave: 'A', Valor: matriz de la imagen.
+    """
+    diccionario_templates = {}
+    for archivo in os.listdir(carpeta):
+        if archivo.endswith(".png"):
+            # El nombre del archivo es el caracter (ej: A.png)
+            caracter = archivo.split('.')[0]
+            ruta = os.path.join(carpeta, archivo)
+            
+            # Cargamos en escala de grises
+            img_template = cv2.imread(ruta, cv2.IMREAD_GRAYSCALE)
+            diccionario_templates[caracter] = img_template
+            
+    return diccionario_templates
+
+def leer_caracteres_patente(thresh, letras_detectadas, templates):
+    """
+    Compara cada letra segmentada con los templates para adivinar el texto.
+    """
+    texto_patente = ""
+    
+    # Usamos enumerate para tener el índice 'i' (0 a 6)
+    for i, (x, y, w, h, area) in enumerate(letras_detectadas):
+        # Recortamos el caracter de la imagen binarizada
+        recorte = thresh[y:y+h, x:x+w]
+        
+        # CLAUSURA LOCAL: Rellenamos huecos/imperfecciones del caracter 
+        # antes de compararlo con el template perfecto.
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1))
+        recorte_relleno = cv2.morphologyEx(recorte, cv2.MORPH_CLOSE, kernel)
+        
+        recorte_redimensionado = cv2.resize(recorte_relleno, TAMANIO_PATENTE)
+        
+        mejor_coincidencia = -1
+        mejor_letra = "?"
+
+        # Filtramos el diccionario de templates según la posición del caracter
+        if i in [0, 1, 5, 6]:
+            # Si estamos en la posición 0, 1, 5 o 6, SOLO buscamos letras
+            templates_a_comparar = {k: v for k, v in templates.items() if k.isalpha()}
+        elif i in [2, 3, 4]:
+            # Si estamos en la posición 2, 3 o 4, SOLO buscamos números
+            templates_a_comparar = {k: v for k, v in templates.items() if k.isdigit()}
+        else:
+            # Fallback por si acaso
+            templates_a_comparar = templates
+
+        for letra, img_template in templates_a_comparar.items():
+            # CCOEFF_NORMED devuelve un valor entre -1 y 1. 1 es idéntico.
+            resultado = cv2.matchTemplate(recorte_redimensionado, img_template, cv2.TM_CCOEFF_NORMED)
+            _, max_val, _, _ = cv2.minMaxLoc(resultado)
+            
+            if max_val > mejor_coincidencia:
+                mejor_coincidencia = max_val
+                mejor_letra = letra
+                
+        texto_patente += mejor_letra
+
+    return texto_patente
