@@ -33,6 +33,61 @@
   - Si correspondía a un número (2, 3, 4), se comparaba exclusivamente contra números (`.isdigit()`).
   Esta validación contextual eliminó los falsos positivos y redujo la cantidad de comparaciones matemáticas necesarias por caracter, optimizando el rendimiento general del algoritmo.
 
+### Generación de templates de caracteres
+
+Para realizar el reconocimiento de los caracteres mediante `cv2.matchTemplate`, se creó el script auxiliar `generar_templates.py`. Su función es generar automáticamente una imagen de referencia para cada letra mayúscula del alfabeto (`A-Z`) y para cada dígito (`0-9`).
+
+El script crea, si no existe, una carpeta llamada `templates` y genera dentro de ella un archivo PNG por cada carácter:
+
+```text
+templates/
+├── A.png
+├── B.png
+├── ...
+├── Z.png
+├── 0.png
+├── 1.png
+├── ...
+└── 9.png
+```
+
+Para que los templates tengan una apariencia similar a la utilizada en las patentes argentinas del Mercosur, se intenta cargar la tipografía `FE.TTF`, correspondiente a la familia FE-Schrift. La fuente debe encontrarse dentro de la carpeta `templates`:
+
+```text
+templates/FE.TTF
+```
+
+En caso de que el archivo no esté disponible, el programa utiliza la tipografía predeterminada de Pillow. Sin embargo, esto puede reducir la precisión del reconocimiento, debido a las diferencias visuales entre la fuente genérica y la tipografía real de las patentes.
+
+Para cada carácter, el procedimiento es el siguiente:
+
+1. Se genera una imagen en escala de grises con fondo negro.
+2. Se dibuja el carácter en blanco usando la tipografía seleccionada.
+3. Se calcula el rectángulo mínimo que contiene al carácter para eliminar los márgenes innecesarios.
+4. Se recorta el carácter.
+5. Se redimensiona al tamaño estándar definido en `TAMANIO_PATENTE`, actualmente de `45 × 65` píxeles.
+6. Se guarda el resultado como una imagen PNG dentro de la carpeta `templates`.
+
+La generación de los templates debe ejecutarse una sola vez, antes de correr el programa principal:
+
+```bash
+python generar_templates.py
+```
+
+Durante la ejecución del programa principal, la función `cargar_templates()` lee estos archivos y los almacena en un diccionario, donde la clave es el carácter y el valor es su correspondiente imagen:
+
+```python
+{
+    "A": imagen_template_A,
+    "B": imagen_template_B,
+    ...
+    "9": imagen_template_9
+}
+```
+
+Luego, cada carácter segmentado de la patente se redimensiona al mismo tamaño y se compara con los templates utilizando `cv2.matchTemplate`.
+
+
 ### Refinamiento Estructural: Detección Refinada de los caracteres
 
 * Durante las pruebas iniciales, se detectó que algunos caracteres quedaban fragmentados tras la binarización (por ejemplo, el desgaste en la pintura hacía que una "T" o una "I" se detectara como dos manchas separadas). La solución clásica sería aplicar una operación morfológica de Clausura a toda la imagen para rellenar o unir estos trazos. Sin embargo, esto se descartó categóricamente a nivel global: aplicar una clausura sobre toda la imagen provocaba que, en las fotos donde el auto estaba más alejado, el espacio entre las letras fuera muy poco para el kernel, fusionando múltiples caracteres en un solo bloque insegmentable o con los bordes de la patente.
