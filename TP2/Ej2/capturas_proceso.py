@@ -8,9 +8,10 @@ from helpers import (
     encontrar_patente,
     cargar_templates,
     leer_caracteres_patente,
+    refinar_patente
 )
 
-img_path = '../data/img_11.jpg'
+img_path = '../data/img_12.jpg'
 img_color = cv2.imread(img_path)
 
 img_color = normalizar_imagen(img_color, ancho_estandar=1500)
@@ -23,8 +24,8 @@ img_bh = aplicar_blackhat(img_gray, kernel_size=(15, 15))
 # Imagen binarizada
 thresh = binarizar_adaptativo(img_bh)
 
-#kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-#thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
 #kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
 #thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
 
@@ -37,18 +38,21 @@ mis_templates = cargar_templates("templates")
 img_contornos = cv2.cvtColor(img_color, cv2.COLOR_BGR2RGB)
 img_resultado = img_contornos.copy()
 
+for (x, y, w, h, area) in contornos_detectados:
+    cv2.rectangle(img_contornos, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
 letras_detectadas = encontrar_patente(contornos_detectados)
+
+# Refinamos fino la patente para cuando quedan cortadas algunas partes de una letra.
+# Pasamos la original en GRIS y las coordenadas.
+# La función nos devuelve las coords originales y la imagen del parche limpio para verlo.
+letras_detectadas, parche_limpio = refinar_patente(img_gray, letras_detectadas)
 
 texto_final = leer_caracteres_patente(thresh, letras_detectadas, mis_templates)
 print(f"LA PATENTE DETECTADA ES: {texto_final}")
 
-# Lo mostramos en la imagen resultado
 cv2.putText(img_resultado, texto_final, (letras_detectadas[0][0], letras_detectadas[0][1] - 15), 
             cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 3)
-
-for (x, y, w, h, area) in contornos_detectados:
-    cv2.rectangle(img_contornos, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
     
 for (x, y, w, h, area) in letras_detectadas:
     cv2.rectangle(img_resultado, (x, y), (x + w, y + h), (0, 255, 0), 2)
@@ -69,7 +73,6 @@ plt.subplot(2, 2, 3)
 plt.imshow(img_contornos)
 plt.title(f'Segmentación de contornos')
 plt.axis('off')
-
 
 plt.subplot(2, 2, 4)
 plt.imshow(img_resultado)

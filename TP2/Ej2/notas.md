@@ -33,6 +33,15 @@
   - Si correspondía a un número (2, 3, 4), se comparaba exclusivamente contra números (`.isdigit()`).
   Esta validación contextual eliminó los falsos positivos y redujo la cantidad de comparaciones matemáticas necesarias por caracter, optimizando el rendimiento general del algoritmo.
 
+### Refinamiento Estructural: Detección Refinada de los caracteres
+
+* Durante las pruebas iniciales, se detectó que algunos caracteres quedaban fragmentados tras la binarización (por ejemplo, el desgaste en la pintura hacía que una "T" o una "I" se detectara como dos manchas separadas). La solución clásica sería aplicar una operación morfológica de Clausura a toda la imagen para rellenar o unir estos trazos. Sin embargo, esto se descartó categóricamente a nivel global: aplicar una clausura sobre toda la imagen provocaba que, en las fotos donde el auto estaba más alejado, el espacio entre las letras fuera muy poco para el kernel, fusionando múltiples caracteres en un solo bloque insegmentable o con los bordes de la patente.
+* Para solucionar los caracteres rotos sin afectar la separación entre ellos, diseñamos una arquitectura de segmentación en dos fases aislando el problema en un entorno controlado:
+  1. Primero se realiza la detección general tolerando imperfecciones. Una vez encontradas las coordenadas aproximadas del grupo de caracteres, se calcula una Bounding Box global que envuelve a toda la patente, añadiendo un margen (padding) de seguridad proporcional (1/14 del ancho y 0.1 del alto).
+  2. Se recorta esta región de la imagen original en escala de grises y se redimensiona por interpolación a un tamaño estandarizado estricto (W=450px, H=150px). Este tamaño se calculó estimando el ancho relativo de 7 caracteres más los 6 espacios de la norma Mercosur aprox.
+  3. Al operar sobre este parche de tamaño fijo, se elimina la varianza de escala. Ahora sí, fue seguro aplicar un Black Hat, binarizar (de nuevo) y realizar una Clausura con un kernel específico (9x9). Como la patente siempre mide lo mismo en este recorte estandarizado, el kernel garantiza soldar roturas finas (de 3 a 4 píxeles) dentro de una letra partida, siendo físicamente incapaz de cruzar los amplios espacios que separan a dos letras distintas.
+  4. Finalmente, se redetectan los contornos sobre el parche limpio y las nuevas coordenadas se transforman de regreso al sistema de coordenadas de la imagen original de alta resolución.
+
 ### Problemas aún sin resolver:
 * La imagen 7 tiene su última letra como una T despintada. El código como está, la recorta como si fuera una I.
 * Se intentó usar una clausura y una apertura luego del binarizado para corregir este problema, pero hacía que no se detecte la patente de la imagen 11.
