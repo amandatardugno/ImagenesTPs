@@ -2,7 +2,8 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-from helpers import segmentar_no_verde, detectar_dados, CANTIDAD_DADOS, contar_puntos, detector_puntos, RastreadorDados
+from helpers import (segmentar_no_verde, detectar_dados, contar_puntos, factor_de_forma,
+                     RastreadorDados, CANTIDAD_DADOS, VERDE_MIN, VERDE_MAX)
 
 def imshow(img, new_fig=True, title=None, color_img=False, blocking=False, ticks=False):
     if new_fig:
@@ -32,6 +33,8 @@ if not ret:
 numero_frame = 0
 frames_estables = 0
 reposo_capturado = False
+frame_reposo_idx = None
+historial = []   # (frame, n_dados, frames_estables) para la curva de estabilidad
 
 frame_reposo_crudo = None
 frame_reposo_marcado = None
@@ -106,11 +109,13 @@ while ret:
 
     puntos_anteriores = puntos_actuales.copy()
     reposo = frames_estables >= FRAMES_REPOSO
+    historial.append((numero_frame, n_dados, frames_estables))
 
     # Guardamos el primer frame donde se confirma el reposo 
     if reposo and not reposo_capturado:
         reposo_capturado = True
-        
+        frame_reposo_idx = numero_frame
+
         frame_reposo_crudo = frame.copy()
         frame_reposo_marcado = dibujo.copy() 
         valores_finales = puntos_actuales
@@ -160,3 +165,105 @@ if frame_reposo_crudo is not None:
     plt.show(block=True)
 else:
     print("No se detectó un frame de reposo en este video")
+
+def mascara_blanco_y_puntos(roi_bgr):
+    """ROI de un dado -> (máscara de blanco, ROI con los puntos marcados, cantidad)."""
+    cant, keypoints, mask_blanco = contar_puntos(roi_bgr)
+    roi_marcado = roi_bgr.copy()
+    for kp in keypoints:
+        cv2.circle(roi_marcado, (int(kp.pt[0]), int(kp.pt[1])), int(kp.size / 2), (255, 0, 0), 2)
+    return mask_blanco, cv2.cvtColor(roi_marcado, cv2.COLOR_BGR2RGB), cant
+
+
+if frame_reposo_crudo is not None:
+    bboxes_reposo = detectar_dados(segmentar_no_verde(frame_reposo_crudo))
+
+    # Caso elegido para el zoom
+    bbox_dado = max(bboxes_reposo,
+                    key=lambda b: contar_puntos(frame_reposo_crudo[b[1]:b[1]+b[3], b[0]:b[0]+b[2]])[0])
+    x, y, w, h = bbox_dado
+    roi_reposo = frame_reposo_crudo[y:y+h, x:x+w]
+
+    # Captura zoom a un dado
+    mask_r, roi_r_marcado, cant_r = mascara_blanco_y_puntos(roi_reposo)
+    plt.figure(figsize=(12, 5))
+    ax = plt.subplot(131); imshow(cv2.cvtColor(roi_reposo, cv2.COLOR_BGR2RGB), title="ROI del dado", color_img=True, new_fig=False)
+    plt.subplot(132); imshow(mask_r, title="Máscara de blanco (S<=80, V>=150)", new_fig=False)
+    plt.subplot(133); imshow(roi_r_marcado, title=f"Puntos detectados: {cant_r}", color_img=True, new_fig=False)
+    plt.suptitle("Conteo de puntos en un dado")
+    plt.tight_layout()
+    plt.show(block=True)
+
+    # Captura movimiento vs reposo en los puntos 
+    idx_mov = max(1, (frame_reposo_idx or 16) - 15)
+    cap_mov = cv2.VideoCapture(VIDEO_PATH)
+    cap_mov.set(cv2.CAP_PROP_POS_FRAMES, idx_mov - 1)
+    ret_mov, frame_mov = cap_mov.read()
+    cap_mov.release()
+
+    roi_mov = None
+    if ret_mov:
+        contornos, _ = cv2.findContours(segmentar_no_verde(frame_mov), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        candidatos = []   
+        for c in contornos:
+            area = cv2.contourArea(c)
+            if 1500 <= area <= 12000 and 0.02 <= factor_de_forma(c) <= 0.07:
+                bx, by, bw, bh = cv2.boundingRect(c)
+                cp, _, _ = contar_puntos(frame_mov[by:by+bh, bx:bx+bw])
+                candidatos.append((cp, (bx, by, bw, bh)))
+        if candidatos:
+            _, (bx, by, bw, bh) = min(candidatos, key=lambda t: t[0])
+            roi_mov = frame_mov[by:by+bh, bx:bx+bw]
+
+    if roi_mov is not None:
+        mask_m, roi_m_marcado, cant_m = mascara_blanco_y_puntos(roi_mov)
+        plt.figure(figsize=(12, 8))
+        ax = plt.subplot(231); imshow(cv2.cvtColor(roi_mov, cv2.COLOR_BGR2RGB), title="Dado en MOVIMIENTO", color_img=True, new_fig=False)
+        plt.subplot(232); imshow(mask_m, title="Máscara de blanco", new_fig=False)
+        plt.subplot(233); imshow(roi_m_marcado, title=f"Círculos nítidos: {cant_m}", color_img=True, new_fig=False)
+        plt.subplot(234); imshow(cv2.cvtColor(roi_reposo, cv2.COLOR_BGR2RGB), title="Dado en REPOSO", color_img=True, new_fig=False)
+        plt.subplot(235); imshow(mask_r, title="Máscara de blanco", new_fig=False)
+        plt.subplot(236); imshow(roi_r_marcado, title=f"Círculos nítidos: {cant_r}", color_img=True, new_fig=False)
+        plt.suptitle("Por qué usamos los puntos: en movimiento se desdibujan y no se detectan")
+        plt.tight_layout()
+        plt.show(block=True)
+
+    # Captura efecto de la clausura sobre el borde del dado y el factor de forma
+    hsv_reposo = cv2.cvtColor(frame_reposo_crudo, cv2.COLOR_BGR2HSV)
+    mask_sin = cv2.bitwise_not(cv2.inRange(hsv_reposo, VERDE_MIN, VERDE_MAX))   # sin clausura
+    mask_con = segmentar_no_verde(frame_reposo_crudo)                            # con clausura
+
+    def ff_recorte(mascara, bbox, pad=12):
+        bx, by, bw, bh = bbox
+        sub = mascara[max(0, by-pad):by+bh+pad, max(0, bx-pad):bx+bw+pad]
+        contornos, _ = cv2.findContours(sub, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contornos:
+            return sub, None
+        return sub, factor_de_forma(max(contornos, key=cv2.contourArea))
+
+    sub_sin, ff_sin = ff_recorte(mask_sin, bbox_dado)
+    sub_con, ff_con = ff_recorte(mask_con, bbox_dado)
+    plt.figure(figsize=(9, 5))
+    ax = plt.subplot(121); imshow(sub_sin, title=f"Sin clausura (factor de forma {ff_sin:.4f})", new_fig=False)
+    plt.subplot(122); imshow(sub_con, title=f"Con clausura (factor de forma {ff_con:.4f})", new_fig=False)
+    plt.suptitle("La clausura suaviza el borde y sube el factor de forma")
+    plt.tight_layout()
+    plt.show(block=True)
+
+# Captura curva de estabilidad
+if historial:
+    frames_x = [h[0] for h in historial]
+    n_dados_y = [h[1] for h in historial]
+    estables_y = [h[2] for h in historial]
+
+    plt.figure(figsize=(11, 4))
+    plt.plot(frames_x, n_dados_y, label="dados detectados")
+    plt.plot(frames_x, estables_y, label="frames estables")
+    plt.axhline(CANTIDAD_DADOS, color="gray", linestyle="--", linewidth=1, label=f"{CANTIDAD_DADOS} dados")
+    if frame_reposo_idx is not None:
+        plt.axvline(frame_reposo_idx, color="green", linestyle="--", label=f"reposo (frame {frame_reposo_idx})")
+    plt.xlabel("frame"); plt.ylabel("cantidad")
+    plt.title("Detección de dados y estabilidad a lo largo del video")
+    plt.legend()
+    plt.tight_layout()
+    plt.show(block=True)
