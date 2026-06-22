@@ -26,8 +26,7 @@ def segmentar_no_verde(frame):
     verde = cv2.inRange(hsv, VERDE_MIN, VERDE_MAX)
     mascara = cv2.bitwise_not(verde)
 
-    # Clausura para suavizar el borde rugoso (baja el perímetro y "redondea" el
-    # factor de forma de los dados hacia el del cuadrado).
+    # Clausura para suavizar el borde rugoso
     se = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (KERNEL_CLAUSURA, KERNEL_CLAUSURA))
     return cv2.morphologyEx(mascara, cv2.MORPH_CLOSE, se)
 

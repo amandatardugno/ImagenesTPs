@@ -177,7 +177,7 @@ if imagenes_recortadas:
         
     plt.tight_layout()
     
-    # NUEVO: Guardamos el mosaico de matplotlib en la carpeta outputs
+    # Guardamos el mosaico de matplotlib en la carpeta outputs
     ruta_grafico = os.path.join(CARPETA_SALIDA, "mosaico_resultados.png")
     plt.savefig(ruta_grafico, dpi=300, bbox_inches='tight')
     print(f">> Mosaico final guardado con éxito en: {ruta_grafico}")
