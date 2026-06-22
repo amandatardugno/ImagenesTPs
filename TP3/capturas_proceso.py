@@ -123,7 +123,7 @@ while ret:
         print(f"\n" + "="*50)
         print(f">> REPOSO CONFIRMADO EN EL FRAME {numero_frame}")
         print(f">> Valores informados:")
-        for i, val in enumerate(valores_finales, start=1):
+        for i, val in valores_finales.items():
             print(f"   - D{i}: {val}")
         print("="*50 + "\n")
         

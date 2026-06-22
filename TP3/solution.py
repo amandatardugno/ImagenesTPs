@@ -186,4 +186,4 @@ if imagenes_recortadas:
 else:
     print("\nNo se pudo extraer el reposo de ningún video.")
 
-print("\n¡Estadio cerrado! Todo el procesamiento del TP3 está guardado en /outputs.")
+print(f"\nTodo el procesamiento del TP3 está guardado en /{CARPETA_SALIDA}.")
